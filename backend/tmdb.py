@@ -15,3 +15,15 @@ def search_movie(title):
     response = requests.get(url, params=params)
 
     return response.json()
+
+def get_movie_keywords(movie_id):
+    url = f"{BASE_URL}/movie/{movie_id}/keywords"
+
+    params = {
+        "api_key": TMDB_API_KEY
+    }
+
+    response = requests.get(url, params=params)
+    response.raise_for_status()
+
+    return response.json()
