@@ -35,3 +35,6 @@ movie_profile = Movie(
 
 
 movie_profile.display()
+
+print("\n=== PROFILE TEXT ===")
+print(movie_profile.get_profile())

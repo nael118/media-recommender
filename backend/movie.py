@@ -23,3 +23,17 @@ class Movie:
 
         print("\nOverview:")
         print(self.overview)
+
+    def get_profile(self):
+        return f"""
+        Title: {self.title}
+
+        Genres:
+        {", ".join(self.genres)}
+
+        Keywords:
+        {", ".join(self.keywords)}
+
+        Overview:
+        {self.overview}
+        """
