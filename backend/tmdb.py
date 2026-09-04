@@ -27,3 +27,16 @@ def get_movie_keywords(movie_id):
     response.raise_for_status()
 
     return response.json()
+
+def get_popular_movies(page=1):
+    url = f"{BASE_URL}/movie/popular"
+
+    params = {
+        "api_key": TMDB_API_KEY,
+        "page": page
+    }
+
+    response = requests.get(url, params=params)
+    response.raise_for_status()
+
+    return response.json()

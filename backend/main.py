@@ -1,40 +1,43 @@
 from tmdb import search_movie, get_movie_keywords
-from utils import get_genres
 from movie import Movie
+from semantic_recommender import calculate_semantic_similarity
 
 
-movie_name = input("Enter a movie: ")
+def create_movie_profile(movie_name):
+    results = search_movie(movie_name)
 
-results = search_movie(movie_name)
+    if not results["results"]:
+        print(f"{movie_name} not found.")
+        return None
 
-if not results["results"]:
-    print("Movie not found.")
-    exit()
+    movie_data = results["results"][0]
 
-movie = results["results"][0]
+    keywords_data = get_movie_keywords(movie_data["id"])
 
+    movie = Movie.from_tmdb_result(movie_data, keywords_data)
 
-keywords_data = get_movie_keywords(movie["id"])
+    if movie is None:
+        print(f"{movie_name} found, but doesn't have enough data yet (unreleased or too few ratings).")
+        return None
 
-keywords = [
-    keyword["name"]
-    for keyword in keywords_data["keywords"]
-]
-
-genres = get_genres(movie["genre_ids"])
-
-
-movie_profile = Movie(
-    title=movie["title"],
-    release_date=movie["release_date"],
-    rating=movie["vote_average"],
-    genres=genres,
-    keywords=keywords,
-    overview=movie["overview"]
-)
+    return movie
 
 
-movie_profile.display()
+movie_name1 = input("First movie: ")
+movie_name2 = input("Second movie: ")
 
-print("\n=== PROFILE TEXT ===")
-print(movie_profile.get_profile())
+
+movie1 = create_movie_profile(movie_name1)
+movie2 = create_movie_profile(movie_name2)
+
+
+if movie1 and movie2:
+    print("\n=== Movie 1 ===")
+    movie1.display()
+
+    print("\n=== Movie 2 ===")
+    movie2.display()
+
+    similarity = calculate_semantic_similarity(movie1, movie2)
+
+    print(f"\nSimilarity score: {similarity:.2f}")
