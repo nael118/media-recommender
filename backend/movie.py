@@ -14,6 +14,8 @@ STOP_KEYWORDS = [
 ]
 
 MIN_VOTE_COUNT = 20
+MIN_KEYWORD_COUNT = 2
+MIN_OVERVIEW_LENGTH = 40
 
 
 class Movie:
@@ -66,10 +68,16 @@ class Movie:
             return None
 
         keywords = [
-            keyword["name"]
-            for keyword in keywords_data.get("keywords", [])
-            if keyword["name"].lower() not in STOP_KEYWORDS
-        ]
+                    keyword["name"]
+                    for keyword in keywords_data.get("keywords", [])
+                    if keyword["name"].lower() not in STOP_KEYWORDS
+                ]
+        
+        if len(keywords) < MIN_KEYWORD_COUNT:
+            return None
+
+        if len(movie_data.get("overview", "")) < MIN_OVERVIEW_LENGTH:
+            return None
 
         genres = get_genres(movie_data["genre_ids"])
 
