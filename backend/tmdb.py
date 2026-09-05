@@ -40,3 +40,16 @@ def get_popular_movies(page=1):
     response.raise_for_status()
 
     return response.json()
+
+def get_top_rated_movies(page=1):
+    url = f"{BASE_URL}/movie/top_rated"
+
+    params = {
+        "api_key": TMDB_API_KEY,
+        "page": page
+    }
+
+    response = requests.get(url, params=params)
+    response.raise_for_status()
+
+    return response.json()
