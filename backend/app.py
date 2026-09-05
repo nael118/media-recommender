@@ -1,5 +1,7 @@
 from flask import Flask, request, jsonify
 
+from flask import Flask, request, jsonify, send_from_directory
+
 from recommend import recommend
 
 app = Flask(__name__)
@@ -8,6 +10,9 @@ app = Flask(__name__)
 def health():
     return jsonify({"status": "ok"})
 
+@app.route("/")
+def index():
+    return send_from_directory("static", "index.html")
 
 @app.route("/recommend", methods=["POST"])
 def recommend_endpoint():
