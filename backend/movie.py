@@ -17,7 +17,8 @@ MIN_VOTE_COUNT = 20
 
 
 class Movie:
-    def __init__(self, title, release_date, rating, genres, keywords, overview):
+    def __init__(self, tmdb_id, title, release_date, rating, genres, keywords, overview):
+        self.tmdb_id = tmdb_id
         self.title = title
         self.release_date = release_date
         self.rating = rating
@@ -56,15 +57,6 @@ class Movie:
 
     @classmethod
     def from_tmdb_result(cls, movie_data, keywords_data):
-        """
-        Build a Movie from a TMDb result dict (from search_movie or
-        get_popular_movies) plus its keywords dict (from get_movie_keywords).
-
-        Returns None if the movie doesn't have enough real data yet —
-        e.g. it's unreleased, or barely anyone has rated it. This is a
-        deliberate filter, not a bug: unreleased/unrated movies have thin
-        overviews and no reliable rating, which pollutes the recommender.
-        """
         release_date = movie_data.get("release_date", "")
 
         if not release_date or release_date > date.today().isoformat():
@@ -82,6 +74,7 @@ class Movie:
         genres = get_genres(movie_data["genre_ids"])
 
         return cls(
+            tmdb_id=movie_data["id"],
             title=movie_data["title"],
             release_date=release_date,
             rating=movie_data["vote_average"],
