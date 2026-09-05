@@ -4,6 +4,10 @@ from recommend import recommend
 
 app = Flask(__name__)
 
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok"})
+
 
 @app.route("/recommend", methods=["POST"])
 def recommend_endpoint():
@@ -20,6 +24,12 @@ def recommend_endpoint():
     top_n = data.get("top_n", 10)
 
     results = recommend(titles, top_n=top_n)
+
+    if not results:
+        return jsonify({
+            "error": "None of the provided titles could be found or used.",
+            "input_titles": titles
+        }), 404
 
     return jsonify({
         "input_titles": titles,
