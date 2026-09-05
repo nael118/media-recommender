@@ -24,6 +24,39 @@ def create_table(conn):
     """)
     conn.commit()
 
+def create_books_table(conn):
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS books (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            author TEXT,
+            first_publish_year TEXT,
+            subjects TEXT,
+            description TEXT,
+            embedding TEXT
+        )
+    """)
+    conn.commit()
+
+
+def save_book(conn, work_key, book, embedding):
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT OR REPLACE INTO books
+            (id, title, author, first_publish_year, subjects, description, embedding)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        work_key,
+        book.title,
+        book.author,
+        str(book.first_publish_year),
+        json.dumps(book.subjects),
+        book.description,
+        json.dumps(embedding.tolist())
+    ))
+    conn.commit()
+
 
 def save_movie(conn, movie, embedding):
     cursor = conn.cursor()
