@@ -56,9 +56,10 @@ def build_taste_embedding(titles):
     return taste_embedding, input_ids
 
 
-def recommend(titles, top_n=10):
+def recommend(titles, top_n=10, media_types=("movies", "books")):
     """
     titles: a single title (str) or a list of titles.
+    media_types: which tables to search across, e.g. ("movies",) or ("movies", "books").
     """
     if isinstance(titles, str):
         titles = [titles]
@@ -81,14 +82,23 @@ def recommend(titles, top_n=10):
 
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, title, embedding FROM movies")
-    rows = cursor.fetchall()
+
+    rows = []
+
+    if "movies" in media_types:
+        cursor.execute("SELECT id, title, embedding FROM movies")
+        rows += [(movie_id, title, embedding_json, "movie") for movie_id, title, embedding_json in cursor.fetchall()]
+
+    if "books" in media_types:
+        cursor.execute("SELECT id, title, embedding FROM books")
+        rows += [(book_id, title, embedding_json, "book") for book_id, title, embedding_json in cursor.fetchall()]
+
     conn.close()
 
     results = []
 
-    for movie_id, movie_title, embedding_json in rows:
-        if movie_id in input_ids:
+    for item_id, item_title, embedding_json, media_type in rows:
+        if item_id in input_ids:
             continue
 
         stored_embedding = np.array(json.loads(embedding_json))
@@ -98,7 +108,7 @@ def recommend(titles, top_n=10):
             for input_embedding in input_embeddings
         )
 
-        results.append((movie_title, best_similarity))
+        results.append((item_title, best_similarity, media_type))
 
     results.sort(key=lambda x: x[1], reverse=True)
 
@@ -112,5 +122,5 @@ if __name__ == "__main__":
     recommendations = recommend(titles)
 
     print(f"\nTop {len(recommendations)} recommendations for {titles}:\n")
-    for rank, (movie_title, score) in enumerate(recommendations, start=1):
-        print(f"{rank}. {movie_title} ({score:.2f})")
+    for rank, (item_title, score, media_type) in enumerate(recommendations, start=1):
+        print(f"{rank}. [{media_type}] {item_title} ({score:.2f})")
