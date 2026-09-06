@@ -241,9 +241,10 @@ submitBtn.addEventListener('click', async () => {
       const row = document.createElement('div');
       row.className = 'result-row';
       const barWidth = (rec.score / maxScore) * 100;
+      const mediaLabel = rec.media_type === 'book' ? '📖' : '🎬';
       row.innerHTML = `
         <span class="result-rank">${index + 1}</span>
-        <span class="result-title">${rec.title}</span>
+        <span class="result-title">${mediaLabel} ${rec.title}</span>
         <span class="result-bar-track"><span class="result-bar-fill" style="width: ${barWidth}%"></span></span>
         <span class="result-score">${rec.score.toFixed(2)}</span>
       `;
