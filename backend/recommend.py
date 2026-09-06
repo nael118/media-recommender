@@ -104,8 +104,6 @@ def recommend(titles, top_n=10, media_types=("movies", "books")):
         print("None of the input titles could be found or used.")
         return []
 
-    print("DEBUG input_ids:", input_ids)
-
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -121,20 +119,18 @@ def recommend(titles, top_n=10, media_types=("movies", "books")):
 
     conn.close()
 
-    results = []
+    filtered_rows = [row for row in rows if row[0] not in input_ids]
 
-    for item_id, item_title, embedding_json, media_type in rows:
-        if item_id in input_ids:
-            continue
+    stored_embeddings = np.array([json.loads(embedding_json) for _, _, embedding_json, _ in filtered_rows])
 
-        stored_embedding = np.array(json.loads(embedding_json))
+    similarity_matrix = cosine_similarity(input_embeddings, stored_embeddings)
 
-        best_similarity = max(
-            cosine_similarity([input_embedding], [stored_embedding])[0][0]
-            for input_embedding in input_embeddings
-        )
+    best_similarities = similarity_matrix.max(axis=0)
 
-        results.append((item_title, best_similarity, media_type))
+    results = [
+        (item_title, best_similarities[i], media_type)
+        for i, (item_id, item_title, embedding_json, media_type) in enumerate(filtered_rows)
+    ]
 
     results.sort(key=lambda x: x[1], reverse=True)
 
