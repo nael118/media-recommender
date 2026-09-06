@@ -6,6 +6,8 @@ from database import get_connection
 from embeddings import generate_embedding
 from movie import Movie
 from tmdb import search_movie, get_movie_keywords
+from openlibrary import search_book, get_work_details
+from book import Book
 
 
 def build_movie_from_title(title):
@@ -25,6 +27,20 @@ def build_movie_from_title(title):
 
     return movie
 
+def build_book_from_title(title):
+    results = search_book(title)
+
+    if not results["docs"]:
+        return None, None
+
+    search_result = results["docs"][0]
+    work_key = search_result["key"]
+
+    work_details = get_work_details(work_key)
+
+    book = Book.from_openlibrary_result(search_result, work_details)
+
+    return book, work_key
 
 def build_taste_embedding(titles):
     """
@@ -70,15 +86,25 @@ def recommend(titles, top_n=10, media_types=("movies", "books")):
     for title in titles:
         movie = build_movie_from_title(title)
 
-        if movie is None:
+        if movie is not None:
+            input_embeddings.append(generate_embedding(movie))
+            input_ids.add(movie.tmdb_id)
             continue
 
-        input_embeddings.append(generate_embedding(movie))
-        input_ids.add(movie.tmdb_id)
+        book, work_key = build_book_from_title(title)
+
+        if book is not None:
+            input_embeddings.append(generate_embedding(book))
+            input_ids.add(work_key)
+            continue
+
+        print(f"'{title}' could not be found as a movie or a book.")
 
     if not input_embeddings:
-        print("None of the input movies could be found or used.")
+        print("None of the input titles could be found or used.")
         return []
+
+    print("DEBUG input_ids:", input_ids)
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -116,7 +142,7 @@ def recommend(titles, top_n=10, media_types=("movies", "books")):
 
 
 if __name__ == "__main__":
-    raw_input = input("Enter one or more movies, separated by commas: ")
+    raw_input = input("Enter one or more movies or books, separated by commas: ")
     titles = [title.strip() for title in raw_input.split(",")]
 
     recommendations = recommend(titles)
