@@ -39,8 +39,8 @@ def recommend_endpoint():
     return jsonify({
         "input_titles": titles,
         "recommendations": [
-            {"title": title, "score": round(float(score), 3)}
-            for title, score in results
+            {"title": title, "score": round(float(score), 3), "media_type": media_type}
+            for title, score, media_type in results
         ]
     })
 
