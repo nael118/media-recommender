@@ -39,6 +39,39 @@ def create_books_table(conn):
     """)
     conn.commit()
 
+def create_liked_items_table(conn):
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS liked_items (
+            id TEXT NOT NULL,
+            media_type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            PRIMARY KEY (id, media_type)
+        )
+    """)
+    conn.commit()
+
+def add_liked_item(conn, item_id, media_type, title):
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT OR IGNORE INTO liked_items (id, media_type, title)
+        VALUES (?, ?, ?)
+    """, (str(item_id), media_type, title))
+    conn.commit()
+
+
+def remove_liked_item(conn, item_id, media_type):
+    cursor = conn.cursor()
+    cursor.execute("""
+        DELETE FROM liked_items WHERE id = ? AND media_type = ?
+    """, (str(item_id), media_type))
+    conn.commit()
+
+
+def get_liked_items(conn):
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, media_type, title FROM liked_items")
+    return cursor.fetchall()
 
 def save_book(conn, work_key, book, embedding):
     cursor = conn.cursor()

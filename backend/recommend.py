@@ -2,7 +2,7 @@ import json
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
-from database import get_connection
+from database import get_connection, add_liked_item, remove_liked_item, get_liked_items, create_liked_items_table
 from embeddings import generate_embedding
 from movie import Movie
 from tmdb import search_movie, get_movie_keywords
@@ -77,6 +77,51 @@ def build_taste_embedding(titles):
 
     return taste_embedding, input_ids
 
+def build_embedding_for_liked_item(item_id, media_type, title):
+    """
+    Given a saved liked item, re-fetches it fresh and generates an embedding.
+    (We don't store embeddings for liked_items directly, since re-fetching stays
+    consistent with how movies/books are embedded elsewhere, and liked_items is
+    a small list, so the extra API calls are cheap.)
+    """
+    if media_type == "movie":
+        movie = build_movie_from_title(title)
+        return generate_embedding(movie) if movie is not None else None
+
+    elif media_type == "book":
+        book, _ = build_book_from_title(title)
+        return generate_embedding(book) if book is not None else None
+
+    return None
+
+
+def recommend_from_profile(top_n=10, media_types=("movies", "books")):
+    """
+    Builds a taste vector from every item in the saved liked_items table,
+    rather than requiring the caller to pass in titles fresh each time.
+    """
+    conn = get_connection()
+    liked_items = get_liked_items(conn)
+    conn.close()
+
+    if not liked_items:
+        print("Your taste profile is empty — like some movies or books first.")
+        return []
+
+    inputs_as_ids = {(item_id, media_type) for item_id, media_type, _ in liked_items}
+
+    input_embeddings = []
+    for item_id, media_type, title in liked_items:
+        embedding = build_embedding_for_liked_item(item_id, media_type, title)
+        if embedding is not None:
+            input_embeddings.append(embedding)
+
+    if not input_embeddings:
+        print("None of your liked items could be re-fetched right now.")
+        return []
+
+    return _score_against_database(input_embeddings, inputs_as_ids, top_n, media_types)
+
 
 def recommend(inputs, top_n=10, media_types=("movies", "books")):
     """
@@ -120,6 +165,54 @@ def recommend(inputs, top_n=10, media_types=("movies", "books")):
         print("None of the input titles could be found or used.")
         return []
 
+def recommend(inputs, top_n=10, media_types=("movies", "books")):
+    """
+    inputs: a single (title, media_type) tuple, or a list of them.
+    media_type must be "movie" or "book".
+    media_types: which tables to search across for recommendations, e.g. ("movies",) or ("movies", "books").
+    """
+    if isinstance(inputs, tuple):
+        inputs = [inputs]
+
+    input_embeddings = []
+    input_ids = set()
+    movie_input_tags = []
+    book_input_tags = []
+
+    for title, media_type in inputs:
+        if media_type == "movie":
+            movie = build_movie_from_title(title)
+
+            if movie is not None:
+                input_embeddings.append(generate_embedding(movie))
+                input_ids.add(movie.tmdb_id)
+                movie_input_tags.append(normalize_tags(movie.genres))
+            else:
+                print(f"'{title}' could not be found as a movie.")
+
+        elif media_type == "book":
+            book, work_key = build_book_from_title(title)
+
+            if book is not None:
+                input_embeddings.append(generate_embedding(book))
+                input_ids.add(work_key)
+                book_input_tags.append(normalize_tags(book.subjects))
+            else:
+                print(f"'{title}' could not be found as a book.")
+
+        else:
+            print(f"Unknown media type '{media_type}' for '{title}'. Use 'movie' or 'book'.")
+
+    if not input_embeddings:
+        print("None of the input titles could be found or used.")
+        return []
+
+    return _score_against_database(input_embeddings, input_ids, top_n, media_types, movie_input_tags, book_input_tags)
+
+def _score_against_database(input_embeddings, input_ids, top_n, media_types, movie_input_tags=None, book_input_tags=None):
+    movie_input_tags = movie_input_tags or []
+    book_input_tags = book_input_tags or []
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -135,7 +228,7 @@ def recommend(inputs, top_n=10, media_types=("movies", "books")):
 
     conn.close()
 
-    filtered_rows = [row for row in rows if row[0] not in input_ids]
+    filtered_rows = [row for row in rows if (row[0], row[3]) not in input_ids and row[0] not in input_ids]
 
     stored_embeddings = np.array([json.loads(row[2]) for row in filtered_rows])
 
@@ -160,7 +253,6 @@ def recommend(inputs, top_n=10, media_types=("movies", "books")):
     results.sort(key=lambda x: x[1], reverse=True)
 
     return results[:top_n]
-
 
 if __name__ == "__main__":
     print("For each title, specify its type as 'movie' or 'book'.")
