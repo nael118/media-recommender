@@ -102,6 +102,18 @@
     cursor: pointer;
   }
 
+    #profile-recommend {
+    width: 100%;
+    background: none;
+    border: 1px solid var(--teal);
+    border-radius: 4px;
+    color: var(--teal);
+    font-size: 0.9rem;
+    padding: 0.7rem;
+    margin-top: 0.6rem;
+    cursor: pointer;
+  }
+
   #submit:disabled {
     opacity: 0.5;
     cursor: default;
@@ -187,6 +199,7 @@
   <button id="add-row" type="button">+ add media</button>
 
   <button id="submit" type="button">Find recommendations</button>
+  <button id="profile-recommend" type="button">Recommend from my profile</button>
   <div id="status"></div>
 
   <div id="results"></div>
@@ -196,6 +209,7 @@
 const titleRows = document.getElementById('title-rows');
 const addRowBtn = document.getElementById('add-row');
 const submitBtn = document.getElementById('submit');
+const profileRecommendBtn = document.getElementById('profile-recommend');
 const statusEl = document.getElementById('status');
 const resultsEl = document.getElementById('results');
 
@@ -212,6 +226,49 @@ function makeRow() {
   `;
   row.querySelector('.remove-row').addEventListener('click', () => row.remove());
   return row;
+}
+
+function renderResults(recommendations) {
+  resultsEl.innerHTML = '';
+  const maxScore = Math.max(...recommendations.map(r => r.score));
+
+  recommendations.forEach((rec, index) => {
+    const row = document.createElement('div');
+    row.className = 'result-row';
+    const barWidth = (rec.score / maxScore) * 100;
+    const mediaLabel = rec.media_type === 'book' ? '📖' : '🎬';
+    row.innerHTML = `
+      <span class="result-rank">${index + 1}</span>
+      <span class="result-title">${mediaLabel} ${rec.title}</span>
+      <span class="result-bar-track"><span class="result-bar-fill" style="width: ${barWidth}%"></span></span>
+      <span class="result-score">${rec.score.toFixed(2)}</span>
+      <button class="like-btn" data-title="${rec.title}" data-media-type="${rec.media_type}">❤️</button>
+    `;
+    resultsEl.appendChild(row);
+  });
+
+  document.querySelectorAll('.like-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = '...';
+
+      try {
+        await fetch('/like', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: btn.dataset.title,
+            media_type: btn.dataset.mediaType,
+            title: btn.dataset.title
+          })
+        });
+        btn.textContent = '✓';
+      } catch (err) {
+        btn.textContent = '❤️';
+        btn.disabled = false;
+      }
+    });
+  });
 }
 
 addRowBtn.addEventListener('click', () => {
@@ -254,26 +311,31 @@ submitBtn.addEventListener('click', async () => {
     }
 
     statusEl.textContent = '';
-
-    const maxScore = Math.max(...data.recommendations.map(r => r.score));
-
-    data.recommendations.forEach((rec, index) => {
-      const row = document.createElement('div');
-      row.className = 'result-row';
-      const barWidth = (rec.score / maxScore) * 100;
-      const mediaLabel = rec.media_type === 'book' ? '📖' : '🎬';
-      row.innerHTML = `
-        <span class="result-rank">${index + 1}</span>
-        <span class="result-title">${mediaLabel} ${rec.title}</span>
-        <span class="result-bar-track"><span class="result-bar-fill" style="width: ${barWidth}%"></span></span>
-        <span class="result-score">${rec.score.toFixed(2)}</span>
-      `;
-      resultsEl.appendChild(row);
-    });
+    renderResults(data.recommendations);
   } catch (err) {
     statusEl.textContent = 'Could not reach the server.';
   } finally {
     submitBtn.disabled = false;
+  }
+});
+
+profileRecommendBtn.addEventListener('click', async () => {
+  statusEl.textContent = 'Loading your recommendations...';
+  resultsEl.innerHTML = '';
+
+  try {
+    const response = await fetch('/recommend/profile');
+    const data = await response.json();
+
+    if (!response.ok) {
+      statusEl.textContent = data.error || 'Something went wrong.';
+      return;
+    }
+
+    statusEl.textContent = '';
+    renderResults(data.recommendations);
+  } catch (err) {
+    statusEl.textContent = 'Could not reach the server.';
   }
 });
 </script>
