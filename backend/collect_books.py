@@ -115,4 +115,4 @@ def collect_books_by_subject(subjects=SUBJECTS, limit_per_subject=30):
 
 
 if __name__ == "__main__":
-    collect_books_by_subject()
+    collect_books_by_subject(subjects=["mystery", "romance", "young_adult_fiction", "historical_fiction", "horror"])
