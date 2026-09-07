@@ -9,6 +9,12 @@ from tmdb import search_movie, get_movie_keywords
 from openlibrary import search_book, get_work_details
 from book import Book
 
+GENRE_BONUS = 0.05
+
+
+def normalize_tags(tags):
+    return set(tag.lower() for tag in tags)
+
 
 def build_movie_from_title(title):
     results = search_movie(title)
@@ -83,6 +89,8 @@ def recommend(inputs, top_n=10, media_types=("movies", "books")):
 
     input_embeddings = []
     input_ids = set()
+    movie_input_tags = []
+    book_input_tags = []
 
     for title, media_type in inputs:
         if media_type == "movie":
@@ -91,6 +99,7 @@ def recommend(inputs, top_n=10, media_types=("movies", "books")):
             if movie is not None:
                 input_embeddings.append(generate_embedding(movie))
                 input_ids.add(movie.tmdb_id)
+                movie_input_tags.append(normalize_tags(movie.genres))
             else:
                 print(f"'{title}' could not be found as a movie.")
 
@@ -100,6 +109,7 @@ def recommend(inputs, top_n=10, media_types=("movies", "books")):
             if book is not None:
                 input_embeddings.append(generate_embedding(book))
                 input_ids.add(work_key)
+                book_input_tags.append(normalize_tags(book.subjects))
             else:
                 print(f"'{title}' could not be found as a book.")
 
@@ -116,27 +126,34 @@ def recommend(inputs, top_n=10, media_types=("movies", "books")):
     rows = []
 
     if "movies" in media_types:
-        cursor.execute("SELECT id, title, embedding FROM movies")
-        rows += [(movie_id, title, embedding_json, "movie") for movie_id, title, embedding_json in cursor.fetchall()]
+        cursor.execute("SELECT id, title, embedding, genres FROM movies")
+        rows += [(movie_id, title, embedding_json, "movie", tags_json) for movie_id, title, embedding_json, tags_json in cursor.fetchall()]
 
     if "books" in media_types:
-        cursor.execute("SELECT id, title, embedding FROM books")
-        rows += [(book_id, title, embedding_json, "book") for book_id, title, embedding_json in cursor.fetchall()]
+        cursor.execute("SELECT id, title, embedding, subjects FROM books")
+        rows += [(book_id, title, embedding_json, "book", tags_json) for book_id, title, embedding_json, tags_json in cursor.fetchall()]
 
     conn.close()
 
     filtered_rows = [row for row in rows if row[0] not in input_ids]
 
-    stored_embeddings = np.array([json.loads(embedding_json) for _, _, embedding_json, _ in filtered_rows])
+    stored_embeddings = np.array([json.loads(row[2]) for row in filtered_rows])
 
     similarity_matrix = cosine_similarity(input_embeddings, stored_embeddings)
-
     best_similarities = similarity_matrix.max(axis=0)
 
-    results = [
-        (item_title, best_similarities[i], media_type)
-        for i, (item_id, item_title, embedding_json, media_type) in enumerate(filtered_rows)
-    ]
+    results = []
+
+    for i, (item_id, item_title, embedding_json, media_type, tags_json) in enumerate(filtered_rows):
+        score = best_similarities[i]
+        candidate_tags = normalize_tags(json.loads(tags_json))
+
+        if media_type == "movie" and any(candidate_tags & input_tags for input_tags in movie_input_tags):
+            score += GENRE_BONUS
+        elif media_type == "book" and any(candidate_tags & input_tags for input_tags in book_input_tags):
+            score += GENRE_BONUS
+
+        results.append((item_title, score, media_type))
 
     results.sort(key=lambda x: x[1], reverse=True)
 
