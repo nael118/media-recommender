@@ -23,12 +23,17 @@ def recommend_endpoint():
 
     titles = data["titles"]
 
-    if isinstance(titles, str):
-        titles = [titles]
+    if not isinstance(titles, list):
+        return jsonify({"error": "'titles' must be a list of {title, media_type} objects."}), 400
+
+    try:
+        inputs = [(item["title"], item["media_type"]) for item in titles]
+    except (KeyError, TypeError):
+        return jsonify({"error": "Each item in 'titles' must have 'title' and 'media_type' fields."}), 400
 
     top_n = data.get("top_n", 10)
 
-    results = recommend(titles, top_n=top_n)
+    results = recommend(inputs, top_n=top_n)
 
     if not results:
         return jsonify({

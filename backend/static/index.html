@@ -157,6 +157,15 @@
     width: 2.4rem;
     text-align: right;
   }
+
+  .title-row select {
+    background: var(--surface);
+    border: 1px solid #2A3634;
+    border-radius: 4px;
+    color: var(--text);
+    padding: 0 0.5rem;
+    font-size: 0.9rem;
+  }
 </style>
 </head>
 <body>
@@ -164,9 +173,13 @@
   <h1>Vibe Match</h1>
   <p class="subhead">Tell it what you like. It finds the through-line.</p>
 
-  <div id="title-rows">
+    <div id="title-rows">
     <div class="title-row">
-      <input type="text" placeholder="A movie you like" />
+      <input type="text" placeholder="A movie or book you like" />
+      <select class="media-type">
+        <option value="movie">Movie</option>
+        <option value="book">Book</option>
+      </select>
       <button type="button" class="remove-row">×</button>
     </div>
   </div>
@@ -190,7 +203,11 @@ function makeRow() {
   const row = document.createElement('div');
   row.className = 'title-row';
   row.innerHTML = `
-    <input type="text" placeholder="A movie you like" />
+    <input type="text" placeholder="A movie or book you like" />
+    <select class="media-type">
+      <option value="movie">Movie</option>
+      <option value="book">Book</option>
+    </select>
     <button type="button" class="remove-row">×</button>
   `;
   row.querySelector('.remove-row').addEventListener('click', () => row.remove());
@@ -206,12 +223,15 @@ titleRows.querySelector('.remove-row').addEventListener('click', (e) => {
 });
 
 submitBtn.addEventListener('click', async () => {
-  const titles = Array.from(titleRows.querySelectorAll('input'))
-    .map(input => input.value.trim())
-    .filter(value => value.length > 0);
+  const titles = Array.from(titleRows.querySelectorAll('.title-row'))
+    .map(row => ({
+      title: row.querySelector('input').value.trim(),
+      media_type: row.querySelector('.media-type').value
+    }))
+    .filter(entry => entry.title.length > 0);
 
   if (titles.length === 0) {
-    statusEl.textContent = 'Enter at least one movie.';
+    statusEl.textContent = 'Enter at least one movie or book.';
     return;
   }
 
