@@ -72,8 +72,8 @@ def recommend_from_profile_endpoint():
 
     return jsonify({
         "recommendations": [
-            {"title": title, "score": round(float(score), 3), "media_type": media_type}
-            for title, score, media_type in results
+            {"id": item_id, "title": title, "score": round(float(score), 3), "media_type": media_type}
+            for item_id, title, score, media_type in results
         ]
     })
 
@@ -107,8 +107,8 @@ def recommend_endpoint():
     return jsonify({
         "input_titles": titles,
         "recommendations": [
-            {"title": title, "score": round(float(score), 3), "media_type": media_type}
-            for title, score, media_type in results
+            {"id": item_id, "title": title, "score": round(float(score), 3), "media_type": media_type}
+            for item_id, title, score, media_type in results
         ]
     })
 

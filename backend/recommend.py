@@ -248,7 +248,7 @@ def _score_against_database(input_embeddings, input_ids, top_n, media_types, mov
             best_overlap = max(len(candidate_tags & input_tags) / len(input_tags) for input_tags in book_input_tags)
             score += GENRE_BONUS * best_overlap
 
-        results.append((item_title, score, media_type))
+        results.append((item_id, item_title, score, media_type))
 
     results.sort(key=lambda x: x[1], reverse=True)
 
@@ -272,5 +272,5 @@ if __name__ == "__main__":
     recommendations = recommend(inputs)
 
     print(f"\nTop {len(recommendations)} recommendations for {inputs}:\n")
-    for rank, (item_title, score, media_type) in enumerate(recommendations, start=1):
+    for rank, (item_id, item_title, score, media_type) in enumerate(recommendations, start=1):
         print(f"{rank}. [{media_type}] {item_title} ({score:.2f})")
