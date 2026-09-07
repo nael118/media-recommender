@@ -148,10 +148,12 @@ def recommend(inputs, top_n=10, media_types=("movies", "books")):
         score = best_similarities[i]
         candidate_tags = normalize_tags(json.loads(tags_json))
 
-        if media_type == "movie" and any(candidate_tags & input_tags for input_tags in movie_input_tags):
-            score += GENRE_BONUS
-        elif media_type == "book" and any(candidate_tags & input_tags for input_tags in book_input_tags):
-            score += GENRE_BONUS
+        if media_type == "movie" and movie_input_tags:
+            best_overlap = max(len(candidate_tags & input_tags) / len(input_tags) for input_tags in movie_input_tags)
+            score += GENRE_BONUS * best_overlap
+        elif media_type == "book" and book_input_tags:
+            best_overlap = max(len(candidate_tags & input_tags) / len(input_tags) for input_tags in book_input_tags)
+            score += GENRE_BONUS * best_overlap
 
         results.append((item_title, score, media_type))
 
