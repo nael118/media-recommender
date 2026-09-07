@@ -39,6 +39,11 @@ class Book:
         if isinstance(description, dict):
             description = description.get("value", "")
 
+        # Open Library sometimes concatenates multiple language versions of the
+        # same description, separated by a blank line. Keep only the first
+        # block so embeddings aren't diluted by duplicate content in another language.
+        description = description.split("\r\n\r\n")[0].split("\n\n")[0].strip()
+
         if not description or len(subjects) < 2:
             return None
 
