@@ -72,33 +72,39 @@ def build_taste_embedding(titles):
     return taste_embedding, input_ids
 
 
-def recommend(titles, top_n=10, media_types=("movies", "books")):
+def recommend(inputs, top_n=10, media_types=("movies", "books")):
     """
-    titles: a single title (str) or a list of titles.
-    media_types: which tables to search across, e.g. ("movies",) or ("movies", "books").
+    inputs: a single (title, media_type) tuple, or a list of them.
+    media_type must be "movie" or "book".
+    media_types: which tables to search across for recommendations, e.g. ("movies",) or ("movies", "books").
     """
-    if isinstance(titles, str):
-        titles = [titles]
+    if isinstance(inputs, tuple):
+        inputs = [inputs]
 
     input_embeddings = []
     input_ids = set()
 
-    for title in titles:
-        movie = build_movie_from_title(title)
+    for title, media_type in inputs:
+        if media_type == "movie":
+            movie = build_movie_from_title(title)
 
-        if movie is not None:
-            input_embeddings.append(generate_embedding(movie))
-            input_ids.add(movie.tmdb_id)
-            continue
+            if movie is not None:
+                input_embeddings.append(generate_embedding(movie))
+                input_ids.add(movie.tmdb_id)
+            else:
+                print(f"'{title}' could not be found as a movie.")
 
-        book, work_key = build_book_from_title(title)
+        elif media_type == "book":
+            book, work_key = build_book_from_title(title)
 
-        if book is not None:
-            input_embeddings.append(generate_embedding(book))
-            input_ids.add(work_key)
-            continue
+            if book is not None:
+                input_embeddings.append(generate_embedding(book))
+                input_ids.add(work_key)
+            else:
+                print(f"'{title}' could not be found as a book.")
 
-        print(f"'{title}' could not be found as a movie or a book.")
+        else:
+            print(f"Unknown media type '{media_type}' for '{title}'. Use 'movie' or 'book'.")
 
     if not input_embeddings:
         print("None of the input titles could be found or used.")
@@ -138,11 +144,22 @@ def recommend(titles, top_n=10, media_types=("movies", "books")):
 
 
 if __name__ == "__main__":
-    raw_input = input("Enter one or more movies or books, separated by commas: ")
-    titles = [title.strip() for title in raw_input.split(",")]
+    print("For each title, specify its type as 'movie' or 'book'.")
+    print("Example: Her:movie, Norwegian Wood:book")
 
-    recommendations = recommend(titles)
+    raw_input = input("Enter one or more titles: ")
 
-    print(f"\nTop {len(recommendations)} recommendations for {titles}:\n")
+    inputs = []
+    for entry in raw_input.split(","):
+        entry = entry.strip()
+        if ":" not in entry:
+            print(f"Skipping '{entry}' — missing ':movie' or ':book' tag.")
+            continue
+        title, media_type = entry.rsplit(":", 1)
+        inputs.append((title.strip(), media_type.strip().lower()))
+
+    recommendations = recommend(inputs)
+
+    print(f"\nTop {len(recommendations)} recommendations for {inputs}:\n")
     for rank, (item_title, score, media_type) in enumerate(recommendations, start=1):
         print(f"{rank}. [{media_type}] {item_title} ({score:.2f})")
