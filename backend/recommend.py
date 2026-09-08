@@ -10,6 +10,8 @@ from openlibrary import search_book, get_work_details
 from book import Book
 
 GENRE_BONUS = 0.05
+MMR_LAMBDA = 0.7
+MMR_CANDIDATE_POOL = 50
 
 
 def normalize_tags(tags):
@@ -209,6 +211,42 @@ def recommend(inputs, top_n=10, media_types=("movies", "books")):
 
     return _score_against_database(input_embeddings, input_ids, top_n, media_types, movie_input_tags, book_input_tags)
 
+def mmr_rerank(candidate_embeddings, candidate_scores, top_n, lambda_param=MMR_LAMBDA):
+    """
+    Re-ranks candidates to balance relevance against diversity.
+    Returns a list of indices into candidate_embeddings/candidate_scores,
+    in the order they should be presented.
+    """
+    num_candidates = len(candidate_scores)
+    if num_candidates == 0:
+        return []
+
+    similarity_matrix = cosine_similarity(candidate_embeddings, candidate_embeddings)
+
+    selected = []
+    remaining = list(range(num_candidates))
+
+    first_pick = max(remaining, key=lambda i: candidate_scores[i])
+    selected.append(first_pick)
+    remaining.remove(first_pick)
+
+    while len(selected) < top_n and remaining:
+        best_index = None
+        best_mmr_score = None
+
+        for i in remaining:
+            max_similarity_to_selected = max(similarity_matrix[i][j] for j in selected)
+            mmr_score = lambda_param * candidate_scores[i] - (1 - lambda_param) * max_similarity_to_selected
+
+            if best_mmr_score is None or mmr_score > best_mmr_score:
+                best_mmr_score = mmr_score
+                best_index = i
+
+        selected.append(best_index)
+        remaining.remove(best_index)
+
+    return selected
+
 def _score_against_database(input_embeddings, input_ids, top_n, media_types, movie_input_tags=None, book_input_tags=None):
     movie_input_tags = movie_input_tags or []
     book_input_tags = book_input_tags or []
@@ -235,7 +273,7 @@ def _score_against_database(input_embeddings, input_ids, top_n, media_types, mov
     similarity_matrix = cosine_similarity(input_embeddings, stored_embeddings)
     best_similarities = similarity_matrix.max(axis=0)
 
-    results = []
+    scored_candidates = []
 
     for i, (item_id, item_title, embedding_json, media_type, tags_json) in enumerate(filtered_rows):
         score = best_similarities[i]
@@ -248,11 +286,25 @@ def _score_against_database(input_embeddings, input_ids, top_n, media_types, mov
             best_overlap = max(len(candidate_tags & input_tags) / len(input_tags) for input_tags in book_input_tags)
             score += GENRE_BONUS * best_overlap
 
-        results.append((item_id, item_title, score, media_type))
+        scored_candidates.append((i, item_id, item_title, score, media_type))
 
-    results.sort(key=lambda x: x[1], reverse=True)
+    scored_candidates.sort(key=lambda x: x[3], reverse=True)
 
-    return results[:top_n]
+    pool_size = min(MMR_CANDIDATE_POOL, len(scored_candidates))
+    pool = scored_candidates[:pool_size]
+
+    pool_original_indices = [entry[0] for entry in pool]
+    pool_embeddings = stored_embeddings[pool_original_indices]
+    pool_scores = [entry[3] for entry in pool]
+
+    mmr_order = mmr_rerank(pool_embeddings, pool_scores, top_n)
+
+    results = [
+        (pool[j][1], pool[j][2], pool[j][3], pool[j][4])
+        for j in mmr_order
+    ]
+
+    return results
 
 if __name__ == "__main__":
     print("For each title, specify its type as 'movie' or 'book'.")
