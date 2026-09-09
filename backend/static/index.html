@@ -198,10 +198,11 @@
 
   <button id="add-row" type="button">+ add media</button>
 
-  <label style="display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.4rem;">
-    Diversity: <span id="diversity-value">0.3</span>
-  </label>
-  <input type="range" id="diversity-slider" min="0" max="1" step="0.1" value="0.3" style="width: 100%; margin-bottom: 1rem;" />
+  <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.3rem;">
+    <span>🎯 Best match</span>
+    <span>🎲 More variety</span>
+  </div>
+  <input type="range" id="diversity-slider" min="0" max="1" step="0.1" value="0.3" style="width: 100%; margin-bottom: 1.2rem;" />
   <button id="submit" type="button">Find recommendations</button>
   <button id="profile-recommend" type="button">Recommend from my profile</button>
   <div id="status"></div>
@@ -217,11 +218,6 @@ const profileRecommendBtn = document.getElementById('profile-recommend');
 const statusEl = document.getElementById('status');
 const resultsEl = document.getElementById('results');
 const diversitySlider = document.getElementById('diversity-slider');
-const diversityValue = document.getElementById('diversity-value');
-
-diversitySlider.addEventListener('input', () => {
-  diversityValue.textContent = diversitySlider.value;
-});
 
 function makeRow() {
   const row = document.createElement('div');
