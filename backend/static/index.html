@@ -139,6 +139,10 @@
     padding: 0.55rem 0;
   }
 
+  .result-row button {
+    flex-shrink: 0;
+  }
+
   .result-rank {
     color: var(--muted);
     font-size: 0.85rem;
@@ -243,12 +247,13 @@ function renderResults(recommendations) {
     row.className = 'result-row';
     const barWidth = (rec.score / maxScore) * 100;
     const mediaLabel = rec.media_type === 'book' ? '📖' : '🎬';
-    row.innerHTML = `
+        row.innerHTML = `
       <span class="result-rank">${index + 1}</span>
       <span class="result-title">${mediaLabel} ${rec.title}</span>
       <span class="result-bar-track"><span class="result-bar-fill" style="width: ${barWidth}%"></span></span>
       <span class="result-score">${rec.score.toFixed(2)}</span>
       <button class="like-btn" data-id="${rec.id}" data-title="${rec.title}" data-media-type="${rec.media_type}">❤️</button>
+      <button class="seen-btn" data-title="${rec.title}" data-media-type="${rec.media_type}">👁️</button>
     `;
     resultsEl.appendChild(row);
   });
@@ -271,6 +276,28 @@ function renderResults(recommendations) {
         btn.textContent = '✓';
       } catch (err) {
         btn.textContent = '❤️';
+        btn.disabled = false;
+      }
+    });
+  });
+
+  document.querySelectorAll('.seen-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = '...';
+
+      try {
+        await fetch('/seen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: btn.dataset.title,
+            media_type: btn.dataset.mediaType
+          })
+        });
+        btn.textContent = '✓';
+      } catch (err) {
+        btn.textContent = '👁️';
         btn.disabled = false;
       }
     });
