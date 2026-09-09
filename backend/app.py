@@ -5,11 +5,18 @@ from flask import Flask, request, jsonify, send_from_directory
 from recommend import recommend
 from database import get_connection, add_liked_item, remove_liked_item, get_liked_items, create_liked_items_table
 from recommend import recommend_from_profile
+from recommend import mark_as_seen
+from database import add_seen_item, remove_seen_item, get_seen_items, create_seen_items_table
 
 app = Flask(__name__)
 
 _startup_conn = get_connection()
 create_liked_items_table(_startup_conn)
+_startup_conn.close()
+
+_startup_conn = get_connection()
+create_liked_items_table(_startup_conn)
+create_seen_items_table(_startup_conn)
 _startup_conn.close()
 
 @app.route("/health", methods=["GET"])
@@ -111,6 +118,48 @@ def recommend_endpoint():
         "recommendations": [
             {"id": item_id, "title": title, "score": round(float(score), 3), "media_type": media_type}
             for item_id, title, score, media_type in results
+        ]
+    })
+
+@app.route("/seen", methods=["POST"])
+def mark_seen():
+    data = request.get_json()
+
+    if not data or "title" not in data or "media_type" not in data:
+        return jsonify({"error": "Request must include 'title' and 'media_type'."}), 400
+
+    success = mark_as_seen(data["title"], data["media_type"])
+
+    if not success:
+        return jsonify({"error": f"Could not find '{data['title']}' as a {data['media_type']}."}), 404
+
+    return jsonify({"status": "marked as seen", "title": data["title"]})
+
+
+@app.route("/seen", methods=["DELETE"])
+def unmark_seen():
+    data = request.get_json()
+
+    if not data or "id" not in data or "media_type" not in data:
+        return jsonify({"error": "Request must include 'id' and 'media_type'."}), 400
+
+    conn = get_connection()
+    remove_seen_item(conn, data["id"], data["media_type"])
+    conn.close()
+
+    return jsonify({"status": "removed"})
+
+
+@app.route("/seen", methods=["GET"])
+def list_seen():
+    conn = get_connection()
+    seen_items = get_seen_items(conn)
+    conn.close()
+
+    return jsonify({
+        "seen_items": [
+            {"id": item_id, "media_type": media_type, "title": title}
+            for item_id, media_type, title in seen_items
         ]
     })
 

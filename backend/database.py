@@ -125,3 +125,38 @@ def get_book_by_title(conn, title):
     cursor = conn.cursor()
     cursor.execute("SELECT id, title, embedding FROM books WHERE title = ?", (title,))
     return cursor.fetchone()
+
+def create_seen_items_table(conn):
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS seen_items (
+            id TEXT NOT NULL,
+            media_type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            PRIMARY KEY (id, media_type)
+        )
+    """)
+    conn.commit()
+
+
+def add_seen_item(conn, item_id, media_type, title):
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT OR IGNORE INTO seen_items (id, media_type, title)
+        VALUES (?, ?, ?)
+    """, (str(item_id), media_type, title))
+    conn.commit()
+
+
+def remove_seen_item(conn, item_id, media_type):
+    cursor = conn.cursor()
+    cursor.execute("""
+        DELETE FROM seen_items WHERE id = ? AND media_type = ?
+    """, (str(item_id), media_type))
+    conn.commit()
+
+
+def get_seen_items(conn):
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, media_type, title FROM seen_items")
+    return cursor.fetchall()

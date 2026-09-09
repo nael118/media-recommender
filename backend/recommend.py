@@ -5,7 +5,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 from database import (
     get_connection, add_liked_item, remove_liked_item, get_liked_items,
     create_liked_items_table, get_movie_by_title, get_book_by_title,
-    create_table, create_books_table, save_movie, save_book
+    create_table, create_books_table, save_movie, save_book,
+    create_seen_items_table, get_seen_items, add_seen_item, remove_seen_item
 )
 from embeddings import generate_embedding
 from movie import Movie
@@ -131,6 +132,25 @@ def build_embedding_for_liked_item(item_id, media_type, title):
         return embedding
 
     return None
+
+def mark_as_seen(title, media_type):
+    if media_type == "movie":
+        item_id, item_title, _ = build_movie_from_title(title)
+    elif media_type == "book":
+        item_id, item_title, _ = build_book_from_title(title)
+    else:
+        print(f"Unknown media type '{media_type}'.")
+        return False
+
+    if item_id is None:
+        print(f"'{title}' could not be found as a {media_type}.")
+        return False
+
+    conn = get_connection()
+    create_seen_items_table(conn)
+    add_seen_item(conn, item_id, media_type, item_title)
+    conn.close()
+    return True
 
 
 def recommend_from_profile(top_n=10, media_types=("movies", "books"), diversity=MMR_LAMBDA):
@@ -269,8 +289,19 @@ def _score_against_database(input_embeddings, input_ids, top_n, media_types, mov
 
     conn.close()
 
-    filtered_rows = [row for row in rows if (row[0], row[3]) not in input_ids and row[0] not in input_ids]
+    conn = get_connection()
+    create_seen_items_table(conn)
+    seen_items = get_seen_items(conn)
+    conn.close()
 
+    seen_ids = {(str(item_id), media_type) for item_id, media_type, _ in seen_items}
+
+    filtered_rows = [
+        row for row in rows
+        if (row[0], row[3]) not in input_ids
+        and row[0] not in input_ids
+        and (str(row[0]), row[3]) not in seen_ids
+    ]
     stored_embeddings = np.array([json.loads(row[2]) for row in filtered_rows])
 
     similarity_matrix = cosine_similarity(input_embeddings, stored_embeddings)
