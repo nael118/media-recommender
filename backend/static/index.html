@@ -198,6 +198,10 @@
 
   <button id="add-row" type="button">+ add media</button>
 
+  <label style="display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.4rem;">
+    Diversity: <span id="diversity-value">0.3</span>
+  </label>
+  <input type="range" id="diversity-slider" min="0" max="1" step="0.1" value="0.3" style="width: 100%; margin-bottom: 1rem;" />
   <button id="submit" type="button">Find recommendations</button>
   <button id="profile-recommend" type="button">Recommend from my profile</button>
   <div id="status"></div>
@@ -212,6 +216,12 @@ const submitBtn = document.getElementById('submit');
 const profileRecommendBtn = document.getElementById('profile-recommend');
 const statusEl = document.getElementById('status');
 const resultsEl = document.getElementById('results');
+const diversitySlider = document.getElementById('diversity-slider');
+const diversityValue = document.getElementById('diversity-value');
+
+diversitySlider.addEventListener('input', () => {
+  diversityValue.textContent = diversitySlider.value;
+});
 
 function makeRow() {
   const row = document.createElement('div');
@@ -300,7 +310,7 @@ submitBtn.addEventListener('click', async () => {
     const response = await fetch('/recommend', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ titles: titles, top_n: 10 })
+      body: JSON.stringify({ titles: titles, top_n: 10, diversity: parseFloat(diversitySlider.value) })
     });
 
     const data = await response.json();
@@ -324,7 +334,7 @@ profileRecommendBtn.addEventListener('click', async () => {
   resultsEl.innerHTML = '';
 
   try {
-    const response = await fetch('/recommend/profile');
+    const response = await fetch(`/recommend/profile?diversity=${diversitySlider.value}`);
     const data = await response.json();
 
     if (!response.ok) {

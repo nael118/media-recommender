@@ -64,8 +64,9 @@ def get_profile():
 @app.route("/recommend/profile", methods=["GET"])
 def recommend_from_profile_endpoint():
     top_n = request.args.get("top_n", default=10, type=int)
+    diversity = request.args.get("diversity", default=0.3, type=float)
 
-    results = recommend_from_profile(top_n=top_n)
+    results = recommend_from_profile(top_n=top_n, diversity=diversity)
 
     if not results:
         return jsonify({"error": "Your taste profile is empty, or none of your liked items could be re-fetched."}), 404
@@ -95,8 +96,9 @@ def recommend_endpoint():
         return jsonify({"error": "Each item in 'titles' must have 'title' and 'media_type' fields."}), 400
 
     top_n = data.get("top_n", 10)
+    diversity = data.get("diversity", 0.3)
 
-    results = recommend(inputs, top_n=top_n)
+    results = recommend(inputs, top_n=top_n, diversity=diversity)
 
     if not results:
         return jsonify({

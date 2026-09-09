@@ -97,7 +97,7 @@ def build_embedding_for_liked_item(item_id, media_type, title):
     return None
 
 
-def recommend_from_profile(top_n=10, media_types=("movies", "books")):
+def recommend_from_profile(top_n=10, media_types=("movies", "books"), diversity=MMR_LAMBDA):
     """
     Builds a taste vector from every item in the saved liked_items table,
     rather than requiring the caller to pass in titles fresh each time.
@@ -122,10 +122,9 @@ def recommend_from_profile(top_n=10, media_types=("movies", "books")):
         print("None of your liked items could be re-fetched right now.")
         return []
 
-    return _score_against_database(input_embeddings, inputs_as_ids, top_n, media_types)
+    return _score_against_database(input_embeddings, inputs_as_ids, top_n, media_types, lambda_param=1 - diversity)
 
-
-def recommend(inputs, top_n=10, media_types=("movies", "books")):
+def recommend(inputs, top_n=10, media_types=("movies", "books"), diversity=MMR_LAMBDA):
     """
     inputs: a single (title, media_type) tuple, or a list of them.
     media_type must be "movie" or "book".
@@ -167,49 +166,7 @@ def recommend(inputs, top_n=10, media_types=("movies", "books")):
         print("None of the input titles could be found or used.")
         return []
 
-def recommend(inputs, top_n=10, media_types=("movies", "books")):
-    """
-    inputs: a single (title, media_type) tuple, or a list of them.
-    media_type must be "movie" or "book".
-    media_types: which tables to search across for recommendations, e.g. ("movies",) or ("movies", "books").
-    """
-    if isinstance(inputs, tuple):
-        inputs = [inputs]
-
-    input_embeddings = []
-    input_ids = set()
-    movie_input_tags = []
-    book_input_tags = []
-
-    for title, media_type in inputs:
-        if media_type == "movie":
-            movie = build_movie_from_title(title)
-
-            if movie is not None:
-                input_embeddings.append(generate_embedding(movie))
-                input_ids.add(movie.tmdb_id)
-                movie_input_tags.append(normalize_tags(movie.genres))
-            else:
-                print(f"'{title}' could not be found as a movie.")
-
-        elif media_type == "book":
-            book, work_key = build_book_from_title(title)
-
-            if book is not None:
-                input_embeddings.append(generate_embedding(book))
-                input_ids.add(work_key)
-                book_input_tags.append(normalize_tags(book.subjects))
-            else:
-                print(f"'{title}' could not be found as a book.")
-
-        else:
-            print(f"Unknown media type '{media_type}' for '{title}'. Use 'movie' or 'book'.")
-
-    if not input_embeddings:
-        print("None of the input titles could be found or used.")
-        return []
-
-    return _score_against_database(input_embeddings, input_ids, top_n, media_types, movie_input_tags, book_input_tags)
+    return _score_against_database(input_embeddings, input_ids, top_n, media_types, movie_input_tags, book_input_tags, lambda_param=1 - diversity)
 
 def mmr_rerank(candidate_embeddings, candidate_scores, top_n, lambda_param=MMR_LAMBDA):
     """
@@ -247,7 +204,7 @@ def mmr_rerank(candidate_embeddings, candidate_scores, top_n, lambda_param=MMR_L
 
     return selected
 
-def _score_against_database(input_embeddings, input_ids, top_n, media_types, movie_input_tags=None, book_input_tags=None):
+def _score_against_database(input_embeddings, input_ids, top_n, media_types, movie_input_tags=None, book_input_tags=None, lambda_param=MMR_LAMBDA):
     movie_input_tags = movie_input_tags or []
     book_input_tags = book_input_tags or []
 
@@ -297,7 +254,7 @@ def _score_against_database(input_embeddings, input_ids, top_n, media_types, mov
     pool_embeddings = stored_embeddings[pool_original_indices]
     pool_scores = [entry[3] for entry in pool]
 
-    mmr_order = mmr_rerank(pool_embeddings, pool_scores, top_n)
+    mmr_order = mmr_rerank(pool_embeddings, pool_scores, top_n, lambda_param=lambda_param)
 
     results = [
         (pool[j][1], pool[j][2], pool[j][3], pool[j][4])
