@@ -114,3 +114,14 @@ def get_movie_count(conn):
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM movies")
     return cursor.fetchone()[0]
+
+def get_movie_by_title(conn, title):
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, title, embedding FROM movies WHERE title = ?", (title,))
+    return cursor.fetchone()
+
+
+def get_book_by_title(conn, title):
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, title, embedding FROM books WHERE title = ?", (title,))
+    return cursor.fetchone()

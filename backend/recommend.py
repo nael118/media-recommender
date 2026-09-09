@@ -2,7 +2,11 @@ import json
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
-from database import get_connection, add_liked_item, remove_liked_item, get_liked_items, create_liked_items_table
+from database import (
+    get_connection, add_liked_item, remove_liked_item, get_liked_items,
+    create_liked_items_table, get_movie_by_title, get_book_by_title,
+    create_table, create_books_table, save_movie, save_book
+)
 from embeddings import generate_embedding
 from movie import Movie
 from tmdb import search_movie, get_movie_keywords
@@ -19,11 +23,19 @@ def normalize_tags(tags):
 
 
 def build_movie_from_title(title):
+    conn = get_connection()
+    cached = get_movie_by_title(conn, title)
+    conn.close()
+
+    if cached is not None:
+        movie_id, cached_title, embedding_json = cached
+        return movie_id, cached_title, np.array(json.loads(embedding_json))
+
     results = search_movie(title)
 
     if not results["results"]:
         print(f"{title} not found.")
-        return None
+        return None, None, None
 
     movie_data = results["results"][0]
     keywords_data = get_movie_keywords(movie_data["id"])
@@ -32,14 +44,30 @@ def build_movie_from_title(title):
 
     if movie is None:
         print(f"{title} found, but doesn't have enough data yet (unreleased or too few ratings).")
+        return None, None, None
 
-    return movie
+    embedding = generate_embedding(movie)
+
+    conn = get_connection()
+    create_table(conn)
+    save_movie(conn, movie, embedding)
+    conn.close()
+
+    return movie.tmdb_id, movie.title, embedding
 
 def build_book_from_title(title):
+    conn = get_connection()
+    cached = get_book_by_title(conn, title)
+    conn.close()
+
+    if cached is not None:
+        work_key, cached_title, embedding_json = cached
+        return work_key, cached_title, np.array(json.loads(embedding_json))
+
     results = search_book(title)
 
     if not results["docs"]:
-        return None, None
+        return None, None, None
 
     search_result = results["docs"][0]
     work_key = search_result["key"]
@@ -48,7 +76,17 @@ def build_book_from_title(title):
 
     book = Book.from_openlibrary_result(search_result, work_details)
 
-    return book, work_key
+    if book is None:
+        return None, None, None
+
+    embedding = generate_embedding(book)
+
+    conn = get_connection()
+    create_books_table(conn)
+    save_book(conn, work_key, book, embedding)
+    conn.close()
+
+    return work_key, book.title, embedding
 
 def build_taste_embedding(titles):
     """
@@ -81,18 +119,16 @@ def build_taste_embedding(titles):
 
 def build_embedding_for_liked_item(item_id, media_type, title):
     """
-    Given a saved liked item, re-fetches it fresh and generates an embedding.
-    (We don't store embeddings for liked_items directly, since re-fetching stays
-    consistent with how movies/books are embedded elsewhere, and liked_items is
-    a small list, so the extra API calls are cheap.)
+    Given a saved liked item, looks it up (from cache if possible) and
+    returns its embedding.
     """
     if media_type == "movie":
-        movie = build_movie_from_title(title)
-        return generate_embedding(movie) if movie is not None else None
+        _, _, embedding = build_movie_from_title(title)
+        return embedding
 
     elif media_type == "book":
-        book, _ = build_book_from_title(title)
-        return generate_embedding(book) if book is not None else None
+        _, _, embedding = build_book_from_title(title)
+        return embedding
 
     return None
 
@@ -140,22 +176,32 @@ def recommend(inputs, top_n=10, media_types=("movies", "books"), diversity=MMR_L
 
     for title, media_type in inputs:
         if media_type == "movie":
-            movie = build_movie_from_title(title)
+            movie_id, movie_title, embedding = build_movie_from_title(title)
 
-            if movie is not None:
-                input_embeddings.append(generate_embedding(movie))
-                input_ids.add(movie.tmdb_id)
-                movie_input_tags.append(normalize_tags(movie.genres))
+            if movie_id is not None:
+                input_embeddings.append(embedding)
+                input_ids.add(movie_id)
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT genres FROM movies WHERE id = ?", (movie_id,))
+                genres = json.loads(cursor.fetchone()[0])
+                conn.close()
+                movie_input_tags.append(normalize_tags(genres))
             else:
                 print(f"'{title}' could not be found as a movie.")
 
         elif media_type == "book":
-            book, work_key = build_book_from_title(title)
+            work_key, book_title, embedding = build_book_from_title(title)
 
-            if book is not None:
-                input_embeddings.append(generate_embedding(book))
+            if work_key is not None:
+                input_embeddings.append(embedding)
                 input_ids.add(work_key)
-                book_input_tags.append(normalize_tags(book.subjects))
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT subjects FROM books WHERE id = ?", (work_key,))
+                subjects = json.loads(cursor.fetchone()[0])
+                conn.close()
+                book_input_tags.append(normalize_tags(subjects))
             else:
                 print(f"'{title}' could not be found as a book.")
 
